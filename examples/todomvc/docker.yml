@@ -1,0 +1,37 @@
+FROM node:18
+
+# Set the working directory
+WORKDIR /
+
+# Copy package.json and yarn.lock first to leverage Docker caching
+COPY package.json ./
+
+# Check if @playwright/test is in dependencies
+RUN if ! grep -q '@playwright/test' package.json; then \
+      echo '@playwright/test is missing in dependencies. Aborting!'; \
+      exit 1; \
+    fi
+
+# Install dependencies
+RUN yarn install --frozen-lockfile
+
+# RUN git clone --branch make-addstep-async-await git@github.com:samjoch/playwright.git /dooc
+
+RUN apt-get update && apt-get install -y unzip && \
+    curl -L https://github.com/samjoch/playwright/archive/refs/heads/make-addstep-async-await.zip -o playwright.zip && \
+    unzip playwright.zip -d / && \
+    mv /playwright-make-addstep-async-await /dooc && \
+    rm playwright.zip
+
+# Create yarn link for Playwright
+RUN cd /dooc/packages/playwright-test && yarn link
+
+WORKDIR /
+
+RUN yarn link @playwright/test
+  
+# Copy the rest of the project files
+COPY . .
+
+# Run Playwright tests
+CMD ["npx", "playwright", "test"]
